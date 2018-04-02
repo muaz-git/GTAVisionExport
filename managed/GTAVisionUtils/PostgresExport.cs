@@ -141,9 +141,13 @@ namespace GTAVisionUtils {
 
         public static async Task<GTARun> StartRun(int sessionid)
         {
+            System.Diagnostics.StackTrace stackTrace = new System.Diagnostics.StackTrace();
             var t = Task.Run(() => StartRunImpl(sessionid));
             return await t;
         }
+
+
+
         public static GTARun StartRunImpl(int sessionid)
         {
             var run = new GTARun();

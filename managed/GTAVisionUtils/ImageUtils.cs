@@ -50,6 +50,8 @@ namespace GTAVisionUtils
             memstream.Close();
 
         }
+        
+
 
         public static void WriteToTiff(Tiff t, int width, int height, List<byte[]> colors, byte[] depth, byte[] stencil)
         {

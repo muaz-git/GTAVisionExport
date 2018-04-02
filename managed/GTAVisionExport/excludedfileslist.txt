@@ -1,0 +1,2 @@
+ScriptHookVDotNet2.xml
+ScriptHookVDotNet2.dll

@@ -64,7 +64,8 @@ namespace GTAVisionUtils
         background,
         person,
         car,
-        bicycle
+        bicycle,
+        property
     }
     public enum DetectionClass {
         Unknown = -1,
@@ -283,6 +284,8 @@ namespace GTAVisionUtils
             //return e.IsInRangeOf(res.HitCoords, 10);
             //return res.HitEntity == e;
         }
+       
+
         public static GTAData DumpData(string imageName, List<Weather> capturedWeathers)
         {
             var ret = new GTAData();
@@ -299,10 +302,12 @@ namespace GTAVisionUtils
             ret.ImageWidth = Game.ScreenResolution.Width;
             ret.ImageHeight = Game.ScreenResolution.Height;
             //ret.Pos = new GTAVector(Game.Player.Character.Position);
-            
+
+            //if (Game.Player.Character != null)
+              //  writeText("");
             var peds = World.GetNearbyPeds(Game.Player.Character, 150.0f);
             var cars = World.GetNearbyVehicles(Game.Player.Character, 150.0f);
-            //var props = World.GetNearbyProps(Game.Player.Character.Position, 300.0f);
+            var props = World.GetNearbyProps(Game.Player.Character.Position, 300.0f);
             
             var constants = VisionNative.GetConstants();
             if (!constants.HasValue) return null;
@@ -325,12 +330,16 @@ namespace GTAVisionUtils
             var cycles = from ped in peds
                 where ped.IsOnBike
                 select new GTADetection(ped, DetectionType.bicycle);
-            
+
+            var propList = from prop in props
+                           where prop.IsOnScreen
+                           select new GTADetection(prop, DetectionType.property);
             var vehicleList = from car in cars
                 select new GTADetection(car);
             ret.Detections = new List<GTADetection>();
             ret.Detections.AddRange(pedList);
             ret.Detections.AddRange(vehicleList);
+            ret.Detections.AddRange(propList);
             //ret.Detections.AddRange(cycles);
             
             return ret;

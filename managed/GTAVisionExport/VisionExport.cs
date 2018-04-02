@@ -35,6 +35,8 @@ using Color = System.Windows.Media.Color;
 using System.Configuration;
 using System.Threading;
 using IniParser;
+using MathNet.Numerics.LinearAlgebra;
+using MathNet.Numerics.LinearAlgebra.Double;
 
 namespace GTAVisionExport {
     
@@ -47,9 +49,13 @@ namespace GTAVisionExport {
 #endif
         //private readonly string dataPath =
         //    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Data");
-        private readonly string dataPath;
-        private readonly string logFilePath;
-        private readonly Weather[] wantedWeather = new Weather[] {Weather.Clear, Weather.Clouds, Weather.Overcast, Weather.Raining, Weather.Christmas};
+        private readonly string dataPath = @"D:\archives\";
+        //private readonly Weather[] wantedWeather = new Weather[] {Weather.Clear, Weather.Clouds, Weather.Overcast, Weather.Raining, Weather.Christmas};
+        //private readonly Weather[] wantedWeather = new Weather[] {Weather.Clear, Weather.Clouds };
+        //private readonly int[] times = { 13, 19, 6, 7, 22};
+        //private readonly int[] times = { 13, 19};
+        private readonly Weather[] wantedWeather = new Weather[] { Weather.Blizzard, Weather.Christmas, Weather.Clear, Weather.Clearing, Weather.Clouds, Weather.ExtraSunny, Weather.Foggy, Weather.Neutral, Weather.Overcast, Weather.Raining, Weather.Smog, Weather.Snowing, Weather.Snowlight, Weather.ThunderStorm};
+        private readonly IDictionary<string, int> timeOfDays = new Dictionary<string, int>();
         private Player player;
         private string outputPath;
         private GTARun run;
@@ -67,18 +73,17 @@ namespace GTAVisionExport {
         private speedAndTime lowSpeedTime = new speedAndTime();
         private bool IsGamePaused = false;
         private StereoCamera cams;
-        public VisionExport()
-        {
-            // loading ini file
-            var parser = new FileIniDataParser();
-            var location = AppDomain.CurrentDomain.BaseDirectory;
-            var data = parser.ReadFile(Path.Combine(location, "GTAVision.ini"));
-
-            //UINotify(ConfigurationManager.AppSettings["database_connection"]);
-            dataPath = data["Snapshots"]["OutputDir"];
-            logFilePath = data["Snapshots"]["LogFile"];
-
-            System.IO.File.WriteAllText(logFilePath, "VisionExport constructor called.\n");
+        //private int weatherCounter;
+        //private int currentHour;
+        private bool debugVar;
+        private readonly string logFilePath = @"D:\archives\logs.txt";
+        int weather_index;
+        bool valid;
+        int time_index;
+        bool pauseFlag;
+        int simpleCounter;
+        //bool tmpFlag = true;
+        private void basicInit() {
             if (!Directory.Exists(dataPath)) Directory.CreateDirectory(dataPath);
             PostgresExport.InitSQLTypes();
             player = Game.Player;
@@ -86,28 +91,92 @@ namespace GTAVisionExport {
             server.Bind(new IPEndPoint(IPAddress.Loopback, 5555));
             server.Listen(5);
             //server = new UdpClient(5555);
+            var parser = new FileIniDataParser();
+            var location = AppDomain.CurrentDomain.BaseDirectory;
+            var data = parser.ReadFile(Path.Combine(location, "GTAVision.ini"));
+            //var access_key = data["aws"]["access_key"];
+            //var secret_key = data["aws"]["secret_key"];
+            //client = new AmazonS3Client(new BasicAWSCredentials(access_key, secret_key), RegionEndpoint.USEast1);
             //outputPath = @"D:\Datasets\GTA\";
             //outputPath = Path.Combine(outputPath, "testData.yaml");
             //outStream = File.CreateText(outputPath);
+
+            World.Weather = Weather.Clear;
+            World.CurrentDayTime = new TimeSpan(14, 0, 0);
+
+            timeOfDays.Add(new KeyValuePair<string, int>("Night1", 22)); // Night 1
+            //timeOfDays.Add(new KeyValuePair<string, int>("Night2", 23)); // Night 2
+            timeOfDays.Add(new KeyValuePair<string, int>("Morning1", 6)); // Morning 1
+            timeOfDays.Add(new KeyValuePair<string, int>("Morning2", 7)); // Morning 2
+            timeOfDays.Add(new KeyValuePair<string, int>("Afternoon", 13)); // Afternoon
+            timeOfDays.Add(new KeyValuePair<string, int>("Evening", 19)); // Evening
+            if (Game.Player.Character.IsInVehicle())
+            {
+                Vehicle v = Game.Player.Character.CurrentVehicle;
+                v.Repair();
+
+                /*World.DestroyAllCameras();
+                myCamera = World.CreateCamera(new Vector3(), new Vector3(), 50);
+                myCamera.IsActive = true;
+                GTA.Native.Function.Call(Hash.RENDER_SCRIPT_CAMS, false, true, myCamera.Handle, true, true);*/
+
+                //v.PrimaryColor = VehicleColor.PureWhite;
+            }
+
             this.Tick += new EventHandler(this.OnTick);
             this.KeyDown += OnKeyDown;
+
             
-            Interval = 1000;
+            Interval = 3000;
             if (enabled)
             {
                 postgresTask?.Wait();
                 postgresTask = StartSession();
                 runTask?.Wait();
                 runTask = StartRun();
+
             }
+
+            
+
+        }
+
+        public VisionExport()
+        {
+
+            UI.Notify("Loaded VisionExport.cs");
+            basicInit();
+            
+            //weatherCounter = 0;
+                                                //currentHour = 8;
+                                                //debugVar = false;
+                                                //World.CurrentDate = new DateTime(24, 12, 5, 18, 0, 0);
+
+            //World.CurrentDayTime = new TimeSpan();
+            //World.Weather = Weather.Smog;
+
+            //UI.ShowSubtitle("location = " + Game.Player.Character.Position.ToString());
+            //Game.Player.Character.Position = new Vector3(-2355.1190f, 3249.4510f, 101.4504f);
+            //Function.Call(GTA.Native.Hash._SET_RAIN_FX_INTENSITY, 1.0f);
+            //Function.Call(GTA.Native.Hash., );
+
+            //yieldScreen();
+
+
+            /*weather_index = 0;
+            time_index = 0;
+            valid = true;
+            pauseFlag = false;
+            simpleCounter = 0;*/
+
+            
+            //debugger();
+            //notify();
         }
 
         private void handlePipeInput()
         {
-            System.IO.File.AppendAllText(logFilePath, "VisionExport handlePipeInput called.\n");
-            UI.Notify("handlePipeInput called");
-            UI.Notify("server connected:" + server.Connected.ToString());
-            UI.Notify(connection == null ? "connection is null" : "connection:" + connection.ToString());
+            //UI.Notify(server.Available.ToString());
             if (connection == null) return;
             
             byte[] inBuffer = new byte[1024];
@@ -133,7 +202,8 @@ namespace GTAVisionExport {
                 connection = null;
                 return;
             }
-            UI.Notify(str.Length.ToString());
+            UI.Notify("I am here "+
+                str.Length.ToString());
             switch (str)
             {
                 case "START_SESSION":
@@ -211,22 +281,176 @@ namespace GTAVisionExport {
             File.Delete(req.FilePath);
             */
         }
+
+        private void yieldScreen() {
+            DateTime endtime;
+            endtime = DateTime.UtcNow + new TimeSpan(0, 0, 0, 0, 500);
+
+            while (endtime > DateTime.UtcNow)
+            {
+                Script.Yield();
+            }
+        }
+
+        private void saveImagesWithTransitTimeAndWeather()
+        {
+            ZipArchive archiveTmp;
+            string outputPathTmp;
+            Stream S3StreamTmp;
+
+            Game.Pause(true);
+
+            Script.Wait(500);
+            
+            List<byte[]> colors;
+            byte[] depthTmp;
+            byte[] stencilTmp;
+
+            depthTmp = VisionNative.GetDepthBuffer();
+            stencilTmp = VisionNative.GetStencilBuffer();
+
+
+            int hour, w, min;
+            
+            outputPathTmp = Path.GetTempFileName();
+            S3StreamTmp = File.Open(outputPathTmp, FileMode.Truncate);
+            archiveTmp = new ZipArchive(S3StreamTmp, ZipArchiveMode.Create);
+            int j = 0;
+            for (w = 0; w < wantedWeather.Length; w++) {
+                
+                World.Weather = wantedWeather[w];
+
+                foreach (KeyValuePair<string, int> item in timeOfDays) {
+                    colors = new List<byte[]>();
+                    World.CurrentDayTime = new TimeSpan(item.Value, 0, 0);
+                    yieldScreen();
+
+                    colors.Add(VisionNative.GetColorBuffer());
+                    ImageUtils.UploadToArchive(archiveTmp, "weather=" + wantedWeather[w].ToString()+"_time="+item.Key.ToString(), Game.ScreenResolution.Width,
+                Game.ScreenResolution.Height, colors, depthTmp, stencilTmp);
+                }
+            }
+            archiveTmp.Dispose();
+            
+            var oldOutputTmp = outputPathTmp;
+            if (oldOutputTmp != null)
+            {
+                File.Move(oldOutputTmp, Path.Combine(dataPath, "Separate_500.zip"));
+             
+            }
+          
+            Game.Pause(false);
+            debugVar = false;
+        }
+
+        private List<byte[]> captureWeatherAndTime() {
+            
+            //var depth = VisionNative.GetDepthBuffer();
+            //var stencil = VisionNative.GetStencilBuffer();
+            List<byte[]> colors = new List<byte[]>();
+                        for (int w = 0; w < wantedWeather.Length; w++)
+            {
+                World.Weather = wantedWeather[w];
+
+                foreach (KeyValuePair<string, int> item in timeOfDays)
+                {
+                   
+                    World.CurrentDayTime = new TimeSpan(item.Value, 0, 0);
+                    yieldScreen();
+
+                    colors.Add(VisionNative.GetColorBuffer());
+                    
+                }
+            }
+            Function.Call(GTA.Native.Hash._SET_RAIN_FX_INTENSITY, 0.0f);
+            return colors;
+        }
+        private void notify()
+        {
+            string ti = "none";
+            TimeSpan ts = World.CurrentDayTime;
+            if (ts.Hours == 22)
+                ti = "Night1";
+            /*if (ts.Hours == 23)
+                ti = "Night2";*/
+            if (ts.Hours == 6)
+                ti = "Morning1";
+            if (ts.Hours == 7)
+                ti = "Morning2";
+            if (ts.Hours == 13)
+                ti = "Afternoon";
+            if (ts.Hours == 19)
+                ti = "Evening";
+            //if (DateTime.UtcNow > notificationFlag)
+            //{
+            UI.Notify("Weather = " + World.Weather.ToString() + " Time = " + ti);
+                
+            //}
+        }
+        /*private void debugger()
+        {
+
+            return;
+            //if (DateTime.UtcNow > weatherChangeTimeFlag) {
+                time_index++;
+                                      
+                
+                if (time_index >= times.Length)
+                {
+                    time_index = 0;
+                    weather_index++;
+
+                    if (weather_index < wantedWeather.Length)
+                    {
+                        World.Weather = wantedWeather[weather_index];
+                        World.CurrentDayTime = new TimeSpan(times[time_index], 0, 0);
+                    }
+                    else
+                    {
+                        valid = false;
+                        UI.ShowSubtitle("Stopped");
+                    }
+                }
+                else
+                {
+                    World.CurrentDayTime = new TimeSpan(times[time_index], 0, 0);
+                }
+
+               // weatherChangeTimeFlag = DateTime.UtcNow + new TimeSpan(0, 0, 0, 3, 0);
+            //}
+
+        }*/
+
         public void OnTick(object o, EventArgs e)
         {
             
+            /*simpleCounter++;
+            if (simpleCounter % 10 == 0 && valid)
+                debugger();
+            if (simpleCounter % 2 == 0)
+                notify();
+*/
+            //return;
+
+            /*World.Weather =Weather.Blizzard;
+            World.CurrentDayTime = new TimeSpan(22, 0, 0);
+            /*if (debugVar)
+                saveImagesWithTransitTimeAndWeather();
+
             
 
+            /*World.CurrentDayTime = new TimeSpan(currentHour, 0, 0);
+            currentHour += 1;*/
             if (server.Poll(10, SelectMode.SelectRead) && connection == null)
             {
                 connection = server.Accept();
                 UI.Notify("CONNECTED");
                 connection.Blocking = false;
             }
-            handlePipeInput();
+            //handlePipeInput();
             if (!enabled) return;
-            
-            //Array values = Enum.GetValues(typeof(Weather));
 
+            //Array values = Enum.GetValues(typeof(Weather));
 
             switch (checkStatus()) {
                 case GameStatus.NeedReload:
@@ -258,34 +482,39 @@ namespace GTAVisionExport {
             if (!runTask.IsCompleted) return;
             if (!postgresTask.IsCompleted) return;
             
-            List<byte[]> colors = new List<byte[]>();
+            List<byte[]> colors;
             Game.Pause(true);
+            //UI.Notify("Pause Start "+ Game.GameTime.ToString());
             Script.Wait(500);
-            GTAData dat = GTAData.DumpData(Game.GameTime + ".tiff", new List<Weather>());
+            
+            //GTAData dat = GTAData.DumpData(Game.GameTime + ".tiff", new List<Weather>());
+            GTAData dat = GTAData.DumpData(Game.GameTime + ".tiff", wantedWeather.ToList());
+            //GTAData dat = null;
             if (dat == null) return;
             var thisframe = VisionNative.GetCurrentTime();
             var depth = VisionNative.GetDepthBuffer();
             var stencil = VisionNative.GetStencilBuffer();
-            colors.Add(VisionNative.GetColorBuffer());
-            /*
-            foreach (var wea in wantedWeather) {
+            //colors.Add(VisionNative.GetColorBuffer());
+            colors = captureWeatherAndTime();
+            /*foreach (var wea in wantedWeather) {
                 World.TransitionToWeather(wea, 0.0f);
                 Script.Wait(1);
                 colors.Add(VisionNative.GetColorBuffer());
             }*/
             Game.Pause(false);
-            
-            /*
-            if (World.Weather != Weather.Snowing)
+            //UI.Notify("Pause Ended " + Game.GameTime.ToString());
+
+
+            /*if (World.Weather != Weather.Snowing)
             {
                 World.TransitionToWeather(Weather.Snowing, 1);
                 
             }*/
-            var colorframe = VisionNative.GetLastColorTime();
-            var depthframe = VisionNative.GetLastConstantTime();
-            var constantframe = VisionNative.GetLastConstantTime();
+            //var colorframe = VisionNative.GetLastColorTime();
+            //var depthframe = VisionNative.GetLastConstantTime();
+            //var constantframe = VisionNative.GetLastConstantTime();
             //UI.Notify("DIFF: " + (colorframe - depthframe) + " FRAMETIME: " + (1 / Game.FPS) * 1000);
-            UI.Notify(colors[0].Length.ToString());
+            //UI.Notify(colors[0].Length.ToString());
             if (depth == null || stencil == null)
             {
                 UI.Notify("No DEPTH");
@@ -314,7 +543,7 @@ namespace GTAVisionExport {
             
             PostgresExport.SaveSnapshot(dat, run.guid);
             S3Stream.Flush();
-            if ((Int64)S3Stream.Length > (Int64)2048 * (Int64)1024 * (Int64)1024) {
+            if ((Int64)S3Stream.Length > (Int64)2048 * (Int64)1024 * (Int64)1024) { // if length exceeds 2GBs save file
                 ImageUtils.WaitForProcessing();
                 StopRun();
                 runTask?.Wait();
@@ -335,6 +564,7 @@ namespace GTAVisionExport {
                 {
                     if (lowSpeedTime.checkTrafficJam(Game.GameTime, vehicle.Speed))
                     {
+                        UI.Notify("Traffic is jam");
                         return GameStatus.NeedReload;
                     }
                 }
@@ -346,6 +576,7 @@ namespace GTAVisionExport {
             }
             else
             {
+                UI.Notify("player is not in vehicle");
                 return GameStatus.NeedReload;
             }
         }
@@ -375,6 +606,7 @@ namespace GTAVisionExport {
 
         public void Autostart()
         {
+            UI.Notify("Autostart()");
             EnterVehicle();
             Script.Wait(200);
             ToggleNavigation();
@@ -386,7 +618,7 @@ namespace GTAVisionExport {
         public async Task StartSession(string name = session_name)
         {
             if (name == null) name = Guid.NewGuid().ToString();
-            if (curSessionId != -1) StopSession();
+            if (curSessionId != -1) StopSession(); // makes sure that there is only one session at a time.
             int id = await PostgresExport.StartSession(name);
             curSessionId = id;
         }
@@ -441,9 +673,29 @@ namespace GTAVisionExport {
             var vehicle = World.GetClosestVehicle(player.Character.Position, 30f);
             player.Character.SetIntoVehicle(vehicle, VehicleSeat.Driver);
             */
+            //UI.Notify("EnterVehicle");
+            //Script.Wait(500);
             Model mod = new Model(GTA.Native.VehicleHash.Asea);
             var vehicle = GTA.World.CreateVehicle(mod, player.Character.Position);
+            
             player.Character.SetIntoVehicle(vehicle, VehicleSeat.Driver);
+           
+            /*World.DestroyAllCameras();
+            myCamera = World.CreateCamera(new Vector3(), new Vector3(), 50);
+            myCamera.IsActive = true;
+            //GTA.Native.Function.Call(Hash.RENDER_SCRIPT_CAMS, false, true, myCamera.Handle, true, true);
+            GTA.Native.Function.Call(Hash.RENDER_SCRIPT_CAMS, false, true, 0, true, true);
+
+            while (!player.Character.IsInVehicle())
+                Script.Yield();
+            //UI.Notify("Yielding done");
+            if (player.Character.IsInVehicle())
+            {
+                //GTA.Native.Function.Call(Hash.RENDER_SCRIPT_CAMS, true, true, myCamera.Handle, true, true);
+                GTA.Native.Function.Call(Hash.RENDER_SCRIPT_CAMS, true, true, 0, true, true);
+            }*/
+
+            //UI.Notify("After Wait");
             //vehicle.Alpha = 0; //transparent
             //player.Character.Alpha = 0;
         }
@@ -496,21 +748,33 @@ namespace GTAVisionExport {
             }
         }
 
+        public void writeText(string txt) {
+            using (System.IO.StreamWriter file =
+            new System.IO.StreamWriter(logFilePath, true))
+            {
+                file.WriteLine(txt);
+            }
+        }
         public void OnKeyDown(object o, KeyEventArgs k)
         {
-            System.IO.File.AppendAllText(logFilePath, "VisionExport OnKeyDown called.\n");
             if (k.KeyCode == Keys.PageUp)
             {
                 postgresTask?.Wait();
                 postgresTask = StartSession();
+
+                
                 runTask?.Wait();
+
+                
                 runTask = StartRun();
                 UI.Notify("GTA Vision Enabled");
             }
             if (k.KeyCode == Keys.PageDown)
             {
+                UI.Notify("Page down pressed");
                 StopRun();
                 StopSession();
+
                 UI.Notify("GTA Vision Disabled");
             }
             if (k.KeyCode == Keys.H) // temp modification
@@ -535,6 +799,7 @@ namespace GTAVisionExport {
             }
             if (k.KeyCode == Keys.G) // temp modification
             {
+                
                 /*
                 IsGamePaused = true;
                 Game.Pause(true);
@@ -576,12 +841,17 @@ namespace GTAVisionExport {
 
             if (k.KeyCode == Keys.T) // temp modification
             {
-                World.Weather = Weather.Raining;
+                //debugger();
+                //notify();
+                
+                //World.Weather = Weather.Raining;
                 /* set it between 0 = stop, 1 = heavy rain. set it too high will lead to sloppy ground */
-                Function.Call(GTA.Native.Hash._SET_RAIN_FX_INTENSITY, 0.5f);
-                var test = Function.Call<float>(GTA.Native.Hash.GET_RAIN_LEVEL);
-                UI.Notify("" + test);
-                World.CurrentDayTime = new TimeSpan(12, 0, 0);
+                
+                //var test = Function.Call<float>(GTA.Native.Hash.GET_RAIN_LEVEL);
+                //UI.Notify(World.Weather.ToString()+"  = " + test);
+                //test += 0.1f;
+                //Function.Call(GTA.Native.Hash._SET_RAIN_FX_INTENSITY, test);
+                //World.CurrentDayTime = new TimeSpan(12, 0, 0);
                 //Script.Wait(5000);
             }
 
@@ -680,9 +950,20 @@ namespace GTAVisionExport {
         }
             if (k.KeyCode == Keys.I)
             {
-                var info = new GTAVisionUtils.InstanceData();
-                UI.Notify(info.type);
-                UI.Notify(info.publichostname);
+                //UI.Notify(World.CurrentDate.ToString());
+                //var test = Function.Call<float>(GTA.Native.Hash.GET_SNOW_LEVEL);
+                //UI.Notify(World.Weather.ToString() + " snow = " + test);
+                //UI.ShowSubtitle("Month = "+World.CurrentDate.Month.ToString()+ " Date = " + World.CurrentDate.Day.ToString()+" Time = "+World.CurrentDayTime.Hours.ToString());
+                //UI.Notify();
+                //pauseFlag = !pauseFlag;
+                //Game.Pause(pauseFlag);
+                //debugVar = true;
+                /*World.Weather = Weather.Snowlight;
+                World.CurrentDayTime = new TimeSpan(23, 0, 0);
+                /*World.CurrentDayTime = new TimeSpan(0, 0, 0);
+                Script.Wait(500);
+                World.TransitionToWeather(wantedWeather[1], 0.0f);
+                Script.Wait(500);*/
             }
         }
     }
