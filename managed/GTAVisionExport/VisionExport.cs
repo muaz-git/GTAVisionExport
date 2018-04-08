@@ -112,7 +112,7 @@ namespace GTAVisionExport {
             this.KeyDown += OnKeyDown;
 
             
-            Interval = 3000;
+            Interval = 3000; // this variable controls after how many milliseconds script will trigger onTick() method.
             if (enabled)
             {
                 postgresTask?.Wait();
