@@ -334,6 +334,7 @@ namespace GTAVisionUtils
             var propList = from prop in props
                            where prop.IsOnScreen
                            select new GTADetection(prop, DetectionType.property);
+
             var vehicleList = from car in cars
                 select new GTADetection(car);
             ret.Detections = new List<GTADetection>();
